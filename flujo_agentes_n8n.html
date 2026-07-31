@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flujo de Agentes IA - Estilo n8n</title>
+    <style>
+        :root {
+            --bg-canvas: #0f172a;
+            --bg-grid: #1e293b;
+            --node-bg: #1e293b;
+            --node-border: #334155;
+            --node-hover: #475569;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;  
+            --accent-orange: #ff6d5a;
+            --accent-blue: #38bdf8;
+            --accent-green: #22c55e;
+            --accent-purple: #a855f7;
+            --accent-amber: #f59e0b;
+            --wire-color: #475569;
+            --wire-active: #ff6d5a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header Bar */
+        header {
+            background-color: #0f172a;
+            border-bottom: 1px solid #1e293b;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .n8n-badge {
+            background: var(--accent-orange);
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .controls-area {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn {
+            background-color: #1e293b;
+            color: var(--text-main);
+            border: 1px solid var(--node-border);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #334155;
+            border-color: #475569;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-orange);
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: #e05645;
+        }
+
+        .route-toggle {
+            display: flex;
+            background: #1e293b;
+            border-radius: 6px;
+            padding: 3px;
+            border: 1px solid var(--node-border);
+        }
+
+        .route-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 5px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .route-btn.active {
+            background: #334155;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        /* Main Canvas Layout */
+        .main-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .canvas {
+            flex: 1;
+            position: relative;
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+            background-size: 24px 24px;
+            overflow: auto;
+        }
+
+        svg#wires-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .wire {
+            stroke: var(--wire-color);
+            stroke-width: 2.5;
+            fill: none;
+            transition: stroke 0.3s;
+        }
+
+        .wire.active {
+            stroke: var(--accent-orange);
+            stroke-dasharray: 6 6;
+            animation: dash 1s linear infinite;
+        }
+
+        @keyframes dash {
+            to { stroke-dashoffset: -12; }
+        }
+
+        /* Node Styling */
+        .node {
+            position: absolute;
+            width: 230px;
+            background: var(--node-bg);
+            border: 1px solid var(--node-border);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 2;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+            user-select: none;
+        }
+
+        .node:hover {
+            border-color: var(--node-hover);
+            transform: translateY(-2px);
+        }
+
+        .node.selected {
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 0 2px rgba(255, 109, 90, 0.3);
+        }
+
+        .node.running {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+        }
+
+        .node.success {
+            border-color: var(--accent-green);
+        }
+
+        .node-header {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--node-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px 8px 0 0;
+        }
+
+        .node-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .node-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .node-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .node-subtitle {
+            font-size: 10px;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .node-body {
+            padding: 10px 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .node-tag {
+            display: inline-block;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.05);
+            margin-top: 6px;
+            color: #cbd5e1;
+        }
+
+        /* Connectors */
+        .port {
+            width: 12px;
+            height: 12px;
+            background: #475569;
+            border: 2px solid var(--node-bg);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: background 0.2s;
+        }
+
+        .port-input { left: -6px; }
+        .port-output { right: -6px; }
+
+        .node.active-port .port {
+            background: var(--accent-orange);
+        }
+
+        /* Status Badge */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #64748b;
+        }
+
+        .status-dot.running {
+            background: var(--accent-blue);
+            box-shadow: 0 0 6px var(--accent-blue);
+        }
+
+        .status-dot.success {
+            background: var(--accent-green);
+        }
+
+        /* Sidebar / Inspector Panel */
+        .inspector {
+            width: 320px;
+            background-color: #0f172a;
+            border-left: 1px solid #1e293b;
+            display: flex;
+            flex-direction: column;
+            z-index: 5;
+        }
+
+        .inspector-header {
+            padding: 16px;
+            border-bottom: 1px solid #1e293b;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .inspector-content {
+            padding: 16px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .prop-group {
+            margin-bottom: 16px;
+        }
+
+        .prop-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .prop-value {
+            font-size: 13px;
+            color: var(--text-main);
+        }
+
+        .json-box {
+            background: #020617;
+            border: 1px solid #1e293b;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #38bdf8;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        /* Flow Pulse Particles */
+        .pulse-particle {
+            fill: var(--accent-orange);
+            filter: drop-shadow(0 0 4px var(--accent-orange));
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .inspector {
+                position: absolute;
+                right: 0;
+                top: 0;
+                bottom: 0;
+                box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
+            }
+            .inspector.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <span class="n8n-badge">n8n IA</span>
+            <h1>Flujo Orquestador Multi-Agente</h1>
+        </div>
+
+        <div class="controls-area">
+            <div class="route-toggle">
+                <button class="route-btn active" id="btn-vehiculos" onclick="setRoute('vehiculos')">Vehículos</button>
+                <button class="route-btn" id="btn-salud" onclick="setRoute('salud')">Salud</button>
+            </div>
+
+            <button class="btn btn-primary" id="run-btn" onclick="runWorkflow()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Ejecutar Flujo
+            </button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="canvas" id="canvas">
+            <svg id="wires-layer">
+                <defs>
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                </defs>
+            </svg>
+
+            <!-- Nodes rendered by JavaScript -->
+        </div>
+
+        <div class="inspector" id="inspector">
+            <div class="inspector-header">
+                <span>Inspección de Nodo</span>
+                <span id="node-id-badge" style="font-size: 10px; background: #334155; padding: 2px 6px; border-radius: 4px;">#node-id</span>
+            </div>
+            <div class="inspector-content">
+                <div class="prop-group">
+                    <div class="prop-label">Nombre del Agente</div>
+                    <div class="prop-value" id="inspect-title">Selecciona un nodo</div>
+                </div>
+                <div class="prop-group">
+                    <div class="prop-label">Tipo / Rol</div>
+                    <div class="prop-value" id="inspect-role" style="color: var(--text-muted);">-</div>
+                </div>
+                <div class="prop-group">
+                    <div class="prop-label">Lógica / Regla de Negocio</div>
+                    <div class="prop-value" id="inspect-desc" style="font-size: 12px;">Haz clic en cualquier nodo para ver sus parámetros y estado de ejecución.</div>
+                </div>
+                <div class="prop-group">
+                    <div class="prop-label">Payload de Entrada / Salida</div>
+                    <div class="json-box" id="inspect-json">// Esperando ejecución o selección...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Workflow Nodes Definition
+        const nodesData = [
+            {
+                id: "node-1",
+                title: "Entrada del Usuario",
+                subtitle: "Trigger / Webhook",
+                desc: "Recibe la consulta del cliente (ej. cotización de auto o póliza de salud).",
+                tag: "Webhook Input",
+                icon: "📥",
+                color: "#ff6d5a",
+                x: 80,
+                y: 200,
+                payload: { user_id: "USR-9482", query: "Quiero cotizar seguro para mi camioneta Toyota 2023", timestamp: "2026-07-31T10:45:00Z" }
+            },
+            {
+                id: "node-2",
+                title: "Agente Clasificador",
+                subtitle: "Intent Classification",
+                desc: "Analiza la intención de la solicitud y extrae las variables clave.",
+                tag: "LLM Router",
+                icon: "🧠",
+                color: "#38bdf8",
+                x: 360,
+                y: 200,
+                payload: { intent: "COTIZACION", domain: "VEHICULOS", confidence: 0.98 }
+            },
+            {
+                id: "node-3",
+                title: "Agente Supervisor",
+                subtitle: "Orquestador de Flujo",
+                desc: "Dirige la ejecución hacia el agente de dominio correspondiente.",
+                tag: "Orchestration",
+                icon: "👑",
+                color: "#a855f7",
+                x: 640,
+                y: 200,
+                payload: { target_agent: "Dominio_A_Vehiculos", session_token: "SESS-77319" }
+            },
+            {
+                id: "node-4a",
+                title: "Agente Dominio A",
+                subtitle: "Especialista Vehículos",
+                desc: "Gestión de cobertura automotriz, modelos, coberturas y deducibles.",
+                tag: "Domain Expert",
+                icon: "🚗",
+                color: "#22c55e",
+                x: 920,
+                y: 90,
+                payload: { auto_brand: "Toyota", auto_year: 2023, risk_category: "Low", required_coverage: ["Amplia", "RC"] }
+            },
+            {
+                id: "node-4b",
+                title: "Agente Dominio B",
+                subtitle: "Especialista Salud",
+                desc: "Gestión de gastos médicos mayores, deducibles y red de hospitales.",
+                tag: "Domain Expert",
+                icon: "🏥",
+                color: "#22c55e",
+                x: 920,
+                y: 310,
+                payload: { age: 34, pre_existing: false, tier: "Preferente", hospital_network: "Nacional" }
+            },
+            {
+                id: "node-5",
+                title: "Agente Verificador",
+                subtitle: "RAG & Vigencias",
+                desc: "Valida la información contra la base de conocimientos y leyes/políticas vigentes.",
+                tag: "RAG Validation",
+                icon: "🛡️",
+                color: "#f59e0b",
+                x: 1200,
+                y: 200,
+                payload: { rag_status: "VERIFIED", norm_compliance: true, discount_eligibility: "15% Promo Julio" }
+            },
+            {
+                id: "node-6",
+                title: "Estimador / Transaccional",
+                subtitle: "Código Determinista",
+                desc: "Ejecuta cálculos matemáticos y llamadas API sin riesgo de alucinación.",
+                tag: "No-LLM Code",
+                icon: "⚡",
+                color: "#ef4444",
+                x: 1480,
+                y: 200,
+                payload: { base_premium: 1200.00, discount: 0.15, final_price: 1020.00, currency: "USD" }
+            },
+            {
+                id: "node-7",
+                title: "Agente Redactor",
+                subtitle: "Sintetizador de Respuesta",
+                desc: "Reformula únicamente los hechos verificados en un mensaje claro para el cliente.",
+                tag: "Fact-Based Reformulator",
+                icon: "✍️",
+                color: "#38bdf8",
+                x: 1760,
+                y: 200,
+                payload: { message: "Hola! Tu cotización para el Toyota 2023 con cobertura Amplia es de $1,020 USD/año con descuento aplicable de promo." }
+            },
+            {
+                id: "node-8",
+                title: "Juez (LLM-as-a-Judge)",
+                subtitle: "Auditoría Asíncrona",
+                desc: "Evalúa fidelidad, seguridad y sesgos de la respuesta en segundo plano.",
+                tag: "Async Audit",
+                icon: "⚖️",
+                color: "#a855f7",
+                x: 2040,
+                y: 200,
+                payload: { hallucination_score: 0.0, policy_compliance: "PASS", response_quality: 9.8 }
+            }
+        ];
+
+        // Workflow Connections
+        const connections = [
+            { from: "node-1", to: "node-2" },
+            { from: "node-2", to: "node-3" },
+            { from: "node-3", to: "node-4a", branch: "vehiculos" },
+            { from: "node-3", to: "node-4b", branch: "salud" },
+            { from: "node-4a", to: "node-5", branch: "vehiculos" },
+            { from: "node-4b", to: "node-5", branch: "salud" },
+            { from: "node-5", to: "node-6" },
+            { from: "node-6", to: "node-7" },
+            { from: "node-7", to: "node-8" }
+        ];
+
+        let selectedRoute = "vehiculos";
+        let isRunning = false;
+        let selectedNodeId = "node-1";
+
+        // Render Nodes
+        function renderNodes() {
+            const canvas = document.getElementById("canvas");
+            
+            nodesData.forEach(node => {
+                const el = document.createElement("div");
+                el.className = "node";
+                el.id = node.id;
+                el.style.left = node.x + "px";
+                el.style.top = node.y + "px";
+
+                el.innerHTML = `
+                    <div class="port port-input"></div>
+                    <div class="node-header">
+                        <div class="node-title-group">
+                            <div class="node-icon" style="background: ${node.color}20; color: ${node.color};">${node.icon}</div>
+                            <div class="node-title">${node.title}</div>
+                        </div>
+                        <div class="status-dot" id="dot-${node.id}"></div>
+                    </div>
+                    <div class="node-subtitle">${node.subtitle}</div>
+                    <div class="node-body">
+                        <div>${node.desc}</div>
+                        <div class="node-tag">${node.tag}</div>
+                    </div>
+                    <div class="port port-output"></div>
+                `;
+
+                el.addEventListener("click", () => selectNode(node.id));
+                canvas.appendChild(el);
+            });
+        }
+
+        // Render SVG Connections
+        function renderWires() {
+            const svg = document.getElementById("wires-layer");
+            // Remove existing wires
+            const existingWires = svg.querySelectorAll(".wire-group");
+            existingWires.forEach(w => w.remove());
+
+            connections.forEach((conn, index) => {
+                const fromEl = document.getElementById(conn.from);
+                const toEl = document.getElementById(conn.to);
+
+                if (!fromEl || !toEl) return;
+
+                // Dim inactive branch wires
+                const isInactiveBranch = conn.branch && conn.branch !== selectedRoute;
+
+                const fromX = fromEl.offsetLeft + fromEl.offsetWidth;
+                const fromY = fromEl.offsetTop + (fromEl.offsetHeight / 2);
+                const toX = toEl.offsetLeft;
+                const toY = toEl.offsetTop + (toEl.offsetHeight / 2);
+
+                const dx = Math.abs(toX - fromX) * 0.5;
+                const pathD = `M ${fromX} ${fromY} C ${fromX + dx} ${fromY}, ${toX - dx} ${toY}, ${toX} ${toY}`;
+
+                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                group.setAttribute("class", "wire-group");
+
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("d", pathD);
+                path.setAttribute("class", "wire");
+                path.setAttribute("id", `wire-${conn.from}-${conn.to}`);
+
+                if (isInactiveBranch) {
+                    path.style.opacity = "0.2";
+                    path.style.strokeDasharray = "4 4";
+                }
+
+                group.appendChild(path);
+                svg.appendChild(group);
+            });
+        }
+
+        // Node Selection
+        function selectNode(id) {
+            selectedNodeId = id;
+            document.querySelectorAll(".node").forEach(n => n.classList.remove("selected"));
+            const el = document.getElementById(id);
+            if (el) el.classList.add("selected");
+
+            const node = nodesData.find(n => n.id === id);
+            if (node) {
+                document.getElementById("node-id-badge").textContent = node.id;
+                document.getElementById("inspect-title").textContent = node.title;
+                document.getElementById("inspect-role").textContent = `${node.subtitle} (${node.tag})`;
+                document.getElementById("inspect-desc").textContent = node.desc;
+                document.getElementById("inspect-json").textContent = JSON.stringify(node.payload, null, 2);
+            }
+        }
+
+        // Set Domain Route
+        function setRoute(route) {
+            selectedRoute = route;
+            document.getElementById("btn-vehiculos").classList.toggle("active", route === "vehiculos");
+            document.getElementById("btn-salud").classList.toggle("active", route === "salud");
+
+            // Update Domain Payload in Node 2 & 3 dynamically
+            const node2 = nodesData.find(n => n.id === "node-2");
+            const node3 = nodesData.find(n => n.id === "node-3");
+            const node1 = nodesData.find(n => n.id === "node-1");
+
+            if (route === "vehiculos") {
+                node1.payload.query = "Quiero cotizar seguro para mi camioneta Toyota 2023";
+                node2.payload = { intent: "COTIZACION", domain: "VEHICULOS", confidence: 0.98 };
+                node3.payload = { target_agent: "Dominio_A_Vehiculos", session_token: "SESS-77319" };
+            } else {
+                node1.payload.query = "Necesito plan de gastos médicos para titular de 34 años";
+                node2.payload = { intent: "COTIZACION", domain: "SALUD", confidence: 0.96 };
+                node3.payload = { target_agent: "Dominio_B_Salud", session_token: "SESS-88210" };
+            }
+
+            renderWires();
+            selectNode(selectedNodeId);
+        }
+
+        // Execute Flow Animation Sequence
+        async function runWorkflow() {
+            if (isRunning) return;
+            isRunning = true;
+            const runBtn = document.getElementById("run-btn");
+            runBtn.disabled = true;
+            runBtn.style.opacity = "0.6";
+
+            // Reset status
+            nodesData.forEach(n => {
+                const el = document.getElementById(n.id);
+                const dot = document.getElementById(`dot-${n.id}`);
+                if (el) el.className = "node";
+                if (dot) dot.className = "status-dot";
+            });
+
+            // Sequence depending on selected route
+            const sequence = [
+                "node-1",
+                "node-2",
+                "node-3",
+                selectedRoute === "vehiculos" ? "node-4a" : "node-4b",
+                "node-5",
+                "node-6",
+                "node-7",
+                "node-8"
+            ];
+
+            for (let i = 0; i < sequence.length; i++) {
+                const nodeId = sequence[i];
+                const nodeEl = document.getElementById(nodeId);
+                const dotEl = document.getElementById(`dot-${nodeId}`);
+
+                selectNode(nodeId);
+
+                if (nodeEl) nodeEl.classList.add("running");
+                if (dotEl) dotEl.classList.add("running");
+
+                // Animate wire leading to this node if not first
+                if (i > 0) {
+                    const prevId = sequence[i - 1];
+                    const wire = document.getElementById(`wire-${prevId}-${nodeId}`);
+                    if (wire) wire.classList.add("active");
+                }
+
+                await new Promise(r => setTimeout(r, 800));
+
+                if (nodeEl) {
+                    nodeEl.classList.remove("running");
+                    nodeEl.classList.add("success");
+                }
+                if (dotEl) {
+                    dotEl.classList.remove("running");
+                    dotEl.classList.add("success");
+                }
+
+                if (i > 0) {
+                    const prevId = sequence[i - 1];
+                    const wire = document.getElementById(`wire-${prevId}-${nodeId}`);
+                    if (wire) wire.classList.remove("active");
+                }
+            }
+
+            isRunning = false;
+            runBtn.disabled = false;
+            runBtn.style.opacity = "1";
+        }
+
+        // Initialize Canvas
+        window.addEventListener("load", () => {
+            renderNodes();
+            renderWires();
+            selectNode("node-1");
+        });
+
+        window.addEventListener("resize", () => {
+            renderWires();
+        });
+    </script>
+</body>
+</html>
